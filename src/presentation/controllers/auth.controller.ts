@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Ip,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -35,8 +36,8 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(@Body() dto: LoginDto) {
-    return this.loginUseCase.execute(dto);
+  async login(@Body() dto: LoginDto, @Ip() ip: string) {
+    return this.loginUseCase.execute(dto, ip);
   }
 
   @Post('refresh')

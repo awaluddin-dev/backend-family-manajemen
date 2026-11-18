@@ -1,8 +1,15 @@
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import type { IUserRepository } from '../../../domain/repositories/user.repository.interface.js';
 import { USER_REPOSITORY } from '../../../domain/repositories/user.repository.interface.js';
 import type { ITokenRepository } from '../../../domain/repositories/token.repository.interface.js';
 import { TOKEN_REPOSITORY } from '../../../domain/repositories/token.repository.interface.js';
+import type { ICaptchaService } from '../../../domain/services/captcha.service.interface.js';
+import { CAPTCHA_SERVICE } from '../../../domain/services/captcha.service.interface.js';
 import { HashingService } from '../../../infrastructure/security/hashing.service.js';
 import { TokenService } from '../../../infrastructure/security/token.service.js';
 import { LoginDto } from '../../dto/auth/login.dto.js';
@@ -15,11 +22,21 @@ export class LoginUseCase {
     private readonly userRepository: IUserRepository,
     @Inject(TOKEN_REPOSITORY)
     private readonly tokenRepository: ITokenRepository,
+    @Inject(CAPTCHA_SERVICE)
+    private readonly captchaService: ICaptchaService,
     private readonly hashingService: HashingService,
     private readonly tokenService: TokenService,
   ) {}
 
-  async execute(dto: LoginDto): Promise<AuthResponseDto> {
+  async execute(dto: LoginDto, ip?: string): Promise<AuthResponseDto> {
+    const isCaptchaValid = await this.captchaService.validateToken(
+      dto.captchaToken,
+      ip,
+    );
+    if (!isCaptchaValid) {
+      throw new BadRequestException('Captcha verification failed');
+    }
+
     const user = await this.userRepository.findByEmail(dto.email);
     if (!user || !user.password) {
       throw new UnauthorizedException('Invalid email or password');

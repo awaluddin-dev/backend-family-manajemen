@@ -24,13 +24,25 @@ async function run() {
     throw new Error('Signup failed');
   }
 
-  console.log('\n2. Testing Login...');
+  console.log('\n2. Testing Login without Captcha (Should fail with 400)...');
+  const loginNoCaptchaRes = await fetch(`${baseUrl}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: testEmail,
+      password: testPassword,
+    }),
+  });
+  console.log('Login without captcha status (Expected 400):', loginNoCaptchaRes.status);
+
+  console.log('\n3. Testing Login with Cloudflare Turnstile token...');
   const loginRes = await fetch(`${baseUrl}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       email: testEmail,
       password: testPassword,
+      captchaToken: 'dummy-turnstile-token',
     }),
   });
   const loginData = await loginRes.json();
@@ -43,10 +55,10 @@ async function run() {
   });
 
   if (loginRes.status !== 200) {
-    throw new Error('Login failed');
+    throw new Error(`Login failed with status: ${loginRes.status} ${JSON.stringify(loginData)}`);
   }
 
-  console.log('\n3. Testing Protected /auth/me with Access Token...');
+  console.log('\n4. Testing Protected /auth/me with Access Token...');
   const meRes = await fetch(`${baseUrl}/auth/me`, {
     headers: { Authorization: `Bearer ${loginData.accessToken}` },
   });
@@ -58,7 +70,7 @@ async function run() {
     throw new Error('Access token authorization failed');
   }
 
-  console.log('\n4. Testing Refresh Token (Rotation & Redis validation)...');
+  console.log('\n5. Testing Refresh Token (Rotation & Redis validation)...');
   const refreshRes = await fetch(`${baseUrl}/auth/refresh`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -72,7 +84,7 @@ async function run() {
     throw new Error('Refresh token failed');
   }
 
-  console.log('\n5. Testing Old Refresh Token Re-use (Should be rejected because rotated)...');
+  console.log('\n6. Testing Old Refresh Token Re-use (Should be rejected because rotated)...');
   const oldRefreshRes = await fetch(`${baseUrl}/auth/refresh`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -80,7 +92,7 @@ async function run() {
   });
   console.log('Old refresh status (Expected 401):', oldRefreshRes.status);
 
-  console.log('\n6. Testing Logout...');
+  console.log('\n7. Testing Logout...');
   const logoutRes = await fetch(`${baseUrl}/auth/logout`, {
     method: 'POST',
     headers: {
@@ -93,7 +105,7 @@ async function run() {
   console.log('Logout status:', logoutRes.status);
   console.log('Logout message:', logoutData);
 
-  console.log('\n7. Testing Refresh Token after Logout (Should be rejected with 401)...');
+  console.log('\n8. Testing Refresh Token after Logout (Should be rejected with 401)...');
   const postLogoutRefreshRes = await fetch(`${baseUrl}/auth/refresh`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

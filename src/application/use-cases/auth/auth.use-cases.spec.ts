@@ -3,7 +3,11 @@ import { SignUpUseCase } from './signup.use-case.js';
 import { LoginUseCase } from './login.use-case.js';
 import { RefreshTokenUseCase } from './refresh-token.use-case.js';
 import { LogoutUseCase } from './logout.use-case.js';
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { UserEntity } from '../../../domain/entities/user.entity.js';
 
 describe('Auth Use Cases', () => {
@@ -11,6 +15,7 @@ describe('Auth Use Cases', () => {
   let mockTokenRepository: any;
   let mockHashingService: any;
   let mockTokenService: any;
+  let mockCaptchaService: any;
 
   beforeEach(() => {
     mockUserRepository = {
@@ -40,6 +45,10 @@ describe('Auth Use Cases', () => {
         refreshExpiresIn: 604800,
       }),
       verifyRefreshToken: vi.fn(),
+    };
+
+    mockCaptchaService = {
+      validateToken: vi.fn().mockResolvedValue(true),
     };
   });
 
@@ -117,7 +126,7 @@ describe('Auth Use Cases', () => {
   });
 
   describe('LoginUseCase', () => {
-    it('should successfully log in and save refresh token with 7 days TTL', async () => {
+    it('should successfully log in when captcha is valid and save refresh token with 7 days TTL', async () => {
       mockUserRepository.findByEmail.mockResolvedValue(
         new UserEntity({
           id: 'user-123',
@@ -131,6 +140,7 @@ describe('Auth Use Cases', () => {
       const useCase = new LoginUseCase(
         mockUserRepository,
         mockTokenRepository,
+        mockCaptchaService,
         mockHashingService,
         mockTokenService,
       );
@@ -138,8 +148,13 @@ describe('Auth Use Cases', () => {
       const result = await useCase.execute({
         email: 'john@example.com',
         password: 'password123',
+        captchaToken: 'valid-turnstile-token',
       });
 
+      expect(mockCaptchaService.validateToken).toHaveBeenCalledWith(
+        'valid-turnstile-token',
+        undefined,
+      );
       expect(mockHashingService.comparePassword).toHaveBeenCalledWith(
         'password123',
         'hashed_password',
@@ -152,6 +167,28 @@ describe('Auth Use Cases', () => {
       expect(result.accessToken).toBe('mock_access_token');
       expect(result.refreshToken).toBe('mock_refresh_token');
       expect(result.refreshExpiresIn).toBe(604800);
+    });
+
+    it('should throw BadRequestException if captcha validation fails', async () => {
+      mockCaptchaService.validateToken.mockResolvedValue(false);
+
+      const useCase = new LoginUseCase(
+        mockUserRepository,
+        mockTokenRepository,
+        mockCaptchaService,
+        mockHashingService,
+        mockTokenService,
+      );
+
+      await expect(
+        useCase.execute({
+          email: 'john@example.com',
+          password: 'password123',
+          captchaToken: 'invalid-token',
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockUserRepository.findByEmail).not.toHaveBeenCalled();
     });
 
     it('should throw UnauthorizedException for wrong password', async () => {
@@ -168,12 +205,17 @@ describe('Auth Use Cases', () => {
       const useCase = new LoginUseCase(
         mockUserRepository,
         mockTokenRepository,
+        mockCaptchaService,
         mockHashingService,
         mockTokenService,
       );
 
       await expect(
-        useCase.execute({ email: 'john@example.com', password: 'wrong' }),
+        useCase.execute({
+          email: 'john@example.com',
+          password: 'wrong',
+          captchaToken: 'valid-turnstile-token',
+        }),
       ).rejects.toThrow(UnauthorizedException);
     });
   });
