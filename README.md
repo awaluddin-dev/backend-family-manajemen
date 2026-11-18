@@ -1,132 +1,221 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Family Management Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Backend REST API untuk **Family Management** — sebuah platform manajemen privat yang dibangun khusus untuk kebutuhan keluarga secara mandiri, aman, dan fleksibel untuk terus dikembangkan sesuai kebutuhan pribadi di masa mendatang.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## 📌 Latar Belakang & Tujuan
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Proyek ini dibangun atas dasar kebutuhan akan aplikasi manajemen privat khusus untuk keluarga sendiri. Dengan membangun versi sendiri dari awal:
+- **Privasi Penuh**: Data keluarga tersimpan aman di server dan database milik sendiri.
+- **Dapat Dikembangkan Bebas**: Fitur dapat disesuaikan dan diperluas sewaktu-waktu sesuai kebutuhan spesifik keluarga (keuangan, jadwal, tugas harian, inventaris, dan lainnya).
+- **Arsitektur Rapi & Skalabel**: Menerapkan *Clean Architecture* sehingga penambahan fitur baru di masa depan terisolasi dengan baik dan mudah dirawat.
 
-## Project setup
+---
 
-```bash
-$ pnpm install
+## 🚀 Tech Stack
+
+- **Framework**: [NestJS](https://nestjs.com/) (ESM, NodeNext)
+- **Database & ORM**: PostgreSQL & [`@nestjs/drizzle`](https://docs.nestjs.com/data/drizzle) (Drizzle ORM)
+- **In-Memory Store**: [Redis](https://redis.io/) (`ioredis`) untuk session management, penyimpanan refresh token (7 hari), rotasi token, dan blacklist/revocation.
+- **Autentikasi**: Dual JWT (*Access Token* 15 menit & *Refresh Token* 7 hari dengan token rotation)
+- **Bot/Brute-force Protection**: [Cloudflare Turnstile](https://www.cloudflare.com/products/turnstile/) CAPTCHA pada endpoint login.
+- **Validasi**: `class-validator` & `class-transformer` via Global `ValidationPipe`.
+- **Testing**: [Vitest](https://vitest.dev/) untuk unit & E2E testing.
+- **Linter**: [Oxlint](https://oxc.rs/) (Fast TypeScript-aware linting).
+
+---
+
+## 🏛️ Clean Architecture Structure
+
+Struktur folder mengadopsi prinsip *Clean Architecture* (*Separation of Concerns* & *Dependency Inversion*):
+
+```text
+src/
+├── domain/                                  # Lapisan Bisnis Inti (Enterprise Rules)
+│   ├── entities/
+│   │   └── user.entity.ts                   # Domain Entity User
+│   ├── repositories/
+│   │   ├── user.repository.interface.ts    # Port interface IUserRepository
+│   │   └── token.repository.interface.ts   # Port interface ITokenRepository (Redis)
+│   └── services/
+│       └── captcha.service.interface.ts    # Port interface ICaptchaService
+│
+├── application/                             # Lapisan Use Cases & DTOs
+│   ├── dto/
+│   │   └── auth/
+│   │       ├── signup.dto.ts                # DTO Registrasi
+│   │       ├── login.dto.ts                 # DTO Login (termasuk captchaToken)
+│   │       ├── refresh-token.dto.ts         # DTO Refresh Token
+│   │       └── auth-response.dto.ts         # DTO Response Profil & Token
+│   └── use-cases/
+│       └── auth/
+│           ├── signup.use-case.ts           # Logika pendaftaran akun baru
+│           ├── login.use-case.ts            # Verifikasi captcha, kredensial, & generate token
+│           ├── refresh-token.use-case.ts    # Validasi Redis & token rotation
+│           ├── logout.use-case.ts           # Revokasi refresh token dari Redis
+│           └── auth.use-cases.spec.ts       # Unit tests (Vitest)
+│
+├── infrastructure/                          # Lapisan Framework, Database, & Tools Eksternal
+│   ├── database/
+│   │   └── drizzle/
+│   │       ├── drizzle.module.ts            # Konfigurasi @nestjs/drizzle
+│   │       ├── database-bootstrap.service.ts# Lifecycle hook inisialisasi tabel
+│   │       └── schema/
+│   │           └── users.schema.ts          # Schema Drizzle PostgreSQL
+│   ├── redis/
+│   │   ├── redis.module.ts                  # Modul Redis
+│   │   └── redis.provider.ts                # Provider koneksi Redis IoRedis
+│   ├── security/
+│   │   ├── hashing.service.ts               # Bcrypt password hashing
+│   │   ├── token.service.ts                 # JWT signing (Access & Refresh)
+│   │   └── turnstile.service.ts             # Cloudflare Turnstile verification adapter
+│   ├── repositories/
+│   │   ├── drizzle-user.repository.ts       # Implementasi IUserRepository via Drizzle
+│   │   └── redis-token.repository.ts        # Implementasi ITokenRepository via Redis
+│   ├── guards/
+│   │   └── jwt-auth.guard.ts                # Guard otentikasi Bearer Access Token
+│   └── decorators/
+│       └── current-user.decorator.ts        # Decorator @CurrentUser()
+│
+├── presentation/                            # Lapisan Antarmuka REST API
+│   └── controllers/
+│       └── auth.controller.ts               # Endpoint /auth/*
+│
+├── auth.module.ts                           # Modul integrasi autentikasi
+├── app.module.ts                            # Root Application Module
+└── main.ts                                  # Entry point aplikasi
 ```
 
-## Compile and run the project
+---
 
-```bash
-# development
-$ pnpm run start
+## 🔐 Mekanisme Autentikasi
 
-# watch mode
-$ pnpm run start:dev
+1. **Dual Token**:
+   - **Access Token**: Berumur pendek (15 menit) untuk mengakses endpoint terlindungi.
+   - **Refresh Token**: Berumur panjang (**7 hari**) yang disimpan di Redis dengan TTL 7 hari (`604800` detik).
+2. **Token Rotation**:
+   - Setiap kali client memanggil `/auth/refresh`, refresh token lama dihapus dari Redis dan diganti dengan pasangan token baru.
+   - Mencegah *replay attack* atau penyalahgunaan token yang telah dicuri.
+3. **Revocation & Logout**:
+   - Saat logout (`POST /auth/logout`), token langsung dihapus dari Redis, sehingga tidak lagi dapat digunakan meskipun belum melewati masa 7 hari.
+4. **Cloudflare Turnstile CAPTCHA**:
+   - Endpoint login mewajibkan `captchaToken` yang diverifikasi ke server Cloudflare (`https://challenges.cloudflare.com/turnstile/v0/siteverify`).
 
-# production mode
-$ pnpm run start:prod
+---
+
+## 📡 Daftar Endpoint REST API
+
+| Method | Endpoint | Keterangan | Header / Auth |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/auth/signup` | Pendaftaran akun pengguna baru | - |
+| `POST` | `/auth/login` | Login dengan verifikasi Cloudflare Turnstile | - |
+| `POST` | `/auth/refresh` | Perbarui Access Token & Refresh Token (rotasi) | - |
+| `POST` | `/auth/logout` | Revokasi session / refresh token | `Bearer <accessToken>` |
+| `GET` | `/auth/me` | Mengambil profil user yang sedang login | `Bearer <accessToken>` |
+
+### Contoh Request & Response
+
+#### 1. Sign Up
+```http
+POST /auth/signup
+Content-Type: application/json
+
+{
+  "name": "Nama Anggota Keluarga",
+  "email": "keluarga@example.com",
+  "password": "PasswordKuat123!"
+}
 ```
 
-## Run tests
+#### 2. Login
+```http
+POST /auth/login
+Content-Type: application/json
 
-```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
+{
+  "email": "keluarga@example.com",
+  "password": "PasswordKuat123!",
+  "captchaToken": "<TOKEN_DARI_CLOUDFLARE_TURNSTILE>"
+}
 ```
 
-## Deployment
+#### 3. Refresh Token
+```http
+POST /auth/refresh
+Content-Type: application/json
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+{
+  "refreshToken": "<REFRESH_TOKEN_7_HARI>"
+}
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Observability
-
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
-
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
-
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
-
-To add it to this project, run this and approve the code it prints at [observe.nestjs.com/link](https://observe.nestjs.com/link) - signing up for free if you have no account:
-
-```bash
-$ npx @nestjs/observe link
+#### 4. Protected Route (`/auth/me`)
+```http
+GET /auth/me
+Authorization: Bearer <ACCESS_TOKEN>
 ```
 
-It installs `@nestjs/observe`, wires it into `AppModule` and `main.ts`, and writes the app key and secret into `.env`, which every `nest start` script (`start`, `start:dev`, `start:debug`) then loads. In production, set `OBSERVE_APP_KEY` and `OBSERVE_APP_SECRET` in the environment instead.
+---
 
-Or do it by hand:
+## ⚙️ Konfigurasi Environment (`.env`)
+
+Buat file `.env` di root project dengan menyalin dari `.env.example`:
 
 ```bash
-$ pnpm install @nestjs/observe
+cp .env.example .env
 ```
 
-Then follow the [setup guide](https://docs.nestjs.com/observability/sdk) - it takes a single import and an app key.
+Contoh konfigurasi:
+```env
+PORT=3000
+DATABASE_URL=postgres://admin:password123@localhost:5432/my_database
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+JWT_ACCESS_SECRET=your_jwt_access_secret_key_here
+JWT_ACCESS_EXPIRES_IN=15m
+JWT_REFRESH_SECRET=your_jwt_refresh_secret_key_here
+JWT_REFRESH_EXPIRES_IN=7d
+CLOUDFLARE_TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
+```
 
-The free plan needs no payment details and covers 300,000 events a month. You can also browse the [live demo](https://www.observe-demo.nestjs.com/dashboard) first - the whole dashboard over a busy service's data, with nothing to install.
+> **Catatan Turnstile**: Key `1x0000000000000000000000000000000AA` adalah dummy secret key resmi dari Cloudflare untuk keperluan testing/development lokal (selalu lolos validasi). Untuk production, ganti dengan Secret Key dari dashboard Cloudflare Anda.
 
-## Resources
+---
 
-Check out a few resources that may come in handy when working with NestJS:
+## 🛠️ Instalasi & Menjalankan Project
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observe](https://observe.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### 1. Install Dependencies
+```bash
+pnpm install
+```
 
-## Support
+### 2. Jalankan PostgreSQL & Redis
+Pastikan PostgreSQL dan Redis aktif di mesin lokal atau jalankan via Docker.
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+### 3. Jalankan Aplikasi
+```bash
+# Development (watch mode)
+pnpm run start:dev
 
-## Stay in touch
+# Build & Run Production
+pnpm run build
+pnpm run start:prod
+```
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+### 4. Menjalankan Tes & Linter
+```bash
+# Unit Tests (Vitest)
+pnpm run test
 
-## License
+# Linting (Oxlint)
+pnpm run lint
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+# Formatting (Prettier)
+pnpm run format
+```
+
+---
+
+## 📄 Lisensi
+Private / Personal Project.
