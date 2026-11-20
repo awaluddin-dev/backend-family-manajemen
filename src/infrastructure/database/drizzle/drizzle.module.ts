@@ -2,7 +2,7 @@ import { Module, Global } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { DrizzleModule as NestDrizzleModule } from '@nestjs/drizzle';
 import { drizzle } from 'drizzle-orm/postgres-js';
-import * as schema from './schema/users.schema.js';
+import * as schema from './schema/index.js';
 import { DatabaseBootstrapService } from './database-bootstrap.service.js';
 
 @Global()

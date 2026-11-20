@@ -1,132 +1,189 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Family Management Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Backend REST API untuk **Family Management** — sebuah platform manajemen privat yang dibangun khusus untuk kebutuhan keluarga secara mandiri, aman, dan fleksibel untuk terus dikembangkan sesuai kebutuhan pribadi di masa mendatang.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## 📌 Latar Belakang & Tujuan
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Proyek ini dibangun atas dasar kebutuhan akan aplikasi manajemen privat khusus untuk keluarga sendiri. Dengan membangun versi sendiri dari awal:
+- **Privasi Penuh**: Data keluarga tersimpan aman di server dan database milik sendiri.
+- **Dapat Dikembangkan Bebas**: Fitur dapat disesuaikan dan diperluas sewaktu-waktu sesuai kebutuhan spesifik keluarga (keuangan, jadwal, tugas harian, inventaris, dan lainnya).
+- **Arsitektur Rapi & Skalabel**: Menerapkan *Clean Architecture* sehingga penambahan fitur baru di masa depan terisolasi dengan baik dan mudah dirawat.
 
-## Project setup
+---
 
-```bash
-$ pnpm install
+## 🚀 Tech Stack
+
+- **Framework**: [NestJS](https://nestjs.com/) (ESM, NodeNext)
+- **Database & ORM**: PostgreSQL & [`@nestjs/drizzle`](https://docs.nestjs.com/data/drizzle) (Drizzle ORM)
+- **In-Memory Store**: [Redis](https://redis.io/) (`ioredis`) untuk session management, penyimpanan refresh token (7 hari), rotasi token, dan blacklist/revocation.
+- **Task Scheduling**: [`@nestjs/schedule`](https://docs.nestjs.com/application/task-scheduling) untuk cron job eksekusi auto-income/outcome harian.
+- **Autentikasi**: Dual JWT (*Access Token* 15 menit & *Refresh Token* 7 hari dengan token rotation).
+- **Bot/Brute-force Protection**: [Cloudflare Turnstile](https://www.cloudflare.com/products/turnstile/) CAPTCHA pada endpoint login.
+- **Validasi**: `class-validator` & `class-transformer` via Global `ValidationPipe`.
+- **Testing**: [Vitest](https://vitest.dev/) untuk unit & E2E testing.
+- **Linter**: [Oxlint](https://oxc.rs/) (Fast TypeScript-aware linting).
+
+---
+
+## 🏛️ Clean Architecture Structure
+
+```text
+src/
+├── domain/                                  # Lapisan Bisnis Inti (Entities & Ports)
+│   ├── entities/
+│   │   ├── user.entity.ts
+│   │   ├── wallet.entity.ts                 # Dompet / Rekening sumber dana
+│   │   ├── category.entity.ts               # Kategori transaksi
+│   │   ├── tax-config.entity.ts             # Konfigurasi pajak acuan
+│   │   ├── recurring-schedule.entity.ts     # Jadwal rutin & rincian komponen
+│   │   └── cashflow-transaction.entity.ts   # Transaksi riil income/outcome
+│   └── repositories/
+│       ├── user.repository.interface.ts
+│       ├── token.repository.interface.ts
+│       ├── wallet.repository.interface.ts
+│       ├── category.repository.interface.ts
+│       ├── tax-config.repository.interface.ts
+│       ├── recurring-schedule.repository.interface.ts
+│       └── cashflow-transaction.repository.interface.ts
+│
+├── application/                             # Lapisan Use Cases & DTOs
+│   ├── dto/
+│   │   ├── auth/ (signup, login, refresh)
+│   │   ├── wallet/ (create-wallet)
+│   │   ├── category/ (create-category)
+│   │   ├── tax-config/ (create-tax-config)
+│   │   ├── income/ (record-manual-income, create-auto-income)
+│   │   ├── outcome/ (record-manual-outcome, preview-tax, create-auto-outcome)
+│   │   └── cashflow/ (cashflow-filter)
+│   └── use-cases/
+│       ├── auth/ (signup, login, refresh, logout)
+│       ├── wallet/ (create-wallet, get-wallets)
+│       ├── category/ (create-category, get-categories)
+│       ├── tax-config/ (create-tax-config, get-tax-configs)
+│       ├── income/
+│       │   ├── record-manual-income.use-case.ts
+│       │   ├── create-auto-income-schedule.use-case.ts
+│       │   └── simulate-annual-income.use-case.ts
+│       ├── outcome/
+│       │   ├── calculate-tax-preview.use-case.ts
+│       │   ├── record-manual-outcome.use-case.ts
+│       │   └── create-auto-outcome-schedule.use-case.ts
+│       └── cashflow/
+│           ├── get-cashflow-transactions.use-case.ts
+│           ├── get-cashflow-summary.use-case.ts
+│           └── process-due-recurring-schedules.use-case.ts
+│
+├── infrastructure/                          # Framework, Database & Third-party
+│   ├── database/drizzle/
+│   │   ├── drizzle.module.ts
+│   │   ├── database-bootstrap.service.ts
+│   │   └── schema/ (users, wallets, categories, tax-configs, recurring, cashflow)
+│   ├── redis/ (redis.module, redis.provider)
+│   ├── security/ (hashing, token, turnstile)
+│   ├── repositories/ (Drizzle & Redis implementations)
+│   ├── scheduler/ (cashflow-cron.service.ts)
+│   ├── guards/ (jwt-auth.guard.ts)
+│   └── decorators/ (current-user.decorator.ts)
+│
+├── presentation/                            # REST API Controllers
+│   └── controllers/
+│       ├── auth.controller.ts
+│       ├── wallet.controller.ts             # /wallets
+│       ├── category.controller.ts           # /categories
+│       ├── tax-config.controller.ts         # /tax-configs
+│       ├── income.controller.ts             # /cashflow/incomes
+│       ├── outcome.controller.ts            # /cashflow/outcomes
+│       └── cashflow.controller.ts           # /cashflow
+│
+├── auth.module.ts
+├── cashflow.module.ts
+├── app.module.ts
+└── main.ts
 ```
 
-## Compile and run the project
+---
+
+## 💰 Fitur Cashflow (Income & Outcome)
+
+### 1. Dompet / Rekening Sumber Dana (`/wallets`)
+- Mencatat berbagai rekening dan tempat penyimpanan dana: Bank (BCA, Mandiri, dll), E-Wallet (GoPay, OVO), Kas Tunai (*Cash*), atau Poin Hadiah.
+- Setiap pemasukan menambah saldo rekening secara otomatis, dan pengeluaran memotong saldo rekening tujuan.
+
+### 2. Pemasukan (Income)
+- **Manual Income**: Pemasukan insidental atau harian (misal claim poin harian, freelance, hadiah) lengkap dengan tanggal, sumber, dan penerima manfaat (*forMember*).
+- **Auto Income**: Pemasukan rutin bulanan (seperti gaji) dengan rincian slip gaji (*allowances* seperti gaji pokok & tunjangan, serta *deductions* seperti potongan PPh 21 & BPJS).
+- **Simulasi 1 Tahun**: Endpoint kalkulasi proyeksi pendapatan 12 bulan beserta estimasi THR.
+
+### 3. Pengeluaran (Outcome)
+- **Kalkulasi Pajak (PPN Prediksi vs Realita)**: Sistem menyediakan kalkulasi PPN otomatis (misal 11%), dengan fleksibilitas pengguna memasukkan nominal pajak riil sesuai struk belanja.
+- **Detail Belanja**: Menyimpan kanal belanja (`ONLINE` / `OFFLINE`), tujuan (misal: "Baju Lebaran"), anggota keluarga yang dibelanjakan (*forMember*, misal: "Anak 1"), dan nama toko/merchant (misal: "Shopee").
+- **Auto Outcome**: Pengeluaran rutin otomatis seperti tagihan bulanan atau langganan.
+
+### 4. Ringkasan & Laporan Cashflow (`/cashflow/summary`)
+- Total Pemasukan, Total Pengeluaran, dan Arus Kas Bersih (*Net Cashflow*).
+- Total Likuiditas Kas Keluarga di seluruh dompet/rekening.
+- Distribusi pengeluaran per kategori (persentase).
+- Distribusi pemasukan & pengeluaran per anggota keluarga (*By Who*).
+- Perbandingan pengeluaran kanal `ONLINE` vs `OFFLINE`.
+
+---
+
+## 📡 Daftar Endpoint REST API
+
+### Autentikasi
+| Method | Endpoint | Keterangan | Header / Auth |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/auth/signup` | Registrasi akun keluarga | - |
+| `POST` | `/auth/login` | Login + validasi Turnstile Captcha | - |
+| `POST` | `/auth/refresh` | Rotasi token (Refresh Token 7 hari) | - |
+| `POST` | `/auth/logout` | Revokasi session dari Redis | `Bearer <accessToken>` |
+| `GET` | `/auth/me` | Profil user aktif | `Bearer <accessToken>` |
+
+### Dompet, Kategori, & Pajak
+| Method | Endpoint | Keterangan | Header / Auth |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/wallets` | Buat dompet/rekening baru | `Bearer <accessToken>` |
+| `GET` | `/wallets` | Ambil daftar dompet & saldo | `Bearer <accessToken>` |
+| `POST` | `/categories` | Buat kategori transaksi baru | `Bearer <accessToken>` |
+| `GET` | `/categories` | Ambil daftar kategori | `Bearer <accessToken>` |
+| `POST` | `/tax-configs` | Buat konfigurasi pajak (misal PPN 11%) | `Bearer <accessToken>` |
+| `GET` | `/tax-configs` | Ambil daftar konfigurasi pajak | `Bearer <accessToken>` |
+
+### Cashflow
+| Method | Endpoint | Keterangan | Header / Auth |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/cashflow/incomes/manual` | Catat pemasukan manual (poin harian, dll) | `Bearer <accessToken>` |
+| `POST` | `/cashflow/incomes/auto-schedule` | Buat jadwal auto gaji & rincian slip | `Bearer <accessToken>` |
+| `GET` | `/cashflow/incomes/simulation/annual` | Simulasi proyeksi pendapatan 1 tahun + THR | `Bearer <accessToken>` |
+| `POST` | `/cashflow/outcomes/preview-tax` | Preview prediksi pajak sebelum submit | `Bearer <accessToken>` |
+| `POST` | `/cashflow/outcomes/manual` | Catat pengeluaran (PPN riil, online/offline, tujuan) | `Bearer <accessToken>` |
+| `POST` | `/cashflow/outcomes/auto-schedule` | Buat jadwal pengeluaran rutin otomatis | `Bearer <accessToken>` |
+| `GET` | `/cashflow/transactions` | Riwayat transaksi dengan filter lengkap | `Bearer <accessToken>` |
+| `GET` | `/cashflow/summary` | Ringkasan cashflow, likuiditas, kategori, & member | `Bearer <accessToken>` |
+| `POST` | `/cashflow/trigger-scheduler` | Trigger manual pemrosesan jadwal recurring | `Bearer <accessToken>` |
+
+---
+
+## 🛠️ Instalasi & Menjalankan Project
 
 ```bash
-# development
-$ pnpm run start
+# 1. Install dependencies
+pnpm install
 
-# watch mode
-$ pnpm run start:dev
+# 2. Jalankan PostgreSQL & Redis
+# (Pastikan database & redis aktif)
 
-# production mode
-$ pnpm run start:prod
+# 3. Jalankan aplikasi
+pnpm run start:dev
+
+# 4. Jalankan pengujian & linter
+pnpm run test
+pnpm run lint
 ```
 
-## Run tests
+---
 
-```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Observability
-
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
-
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
-
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
-
-To add it to this project, run this and approve the code it prints at [observe.nestjs.com/link](https://observe.nestjs.com/link) - signing up for free if you have no account:
-
-```bash
-$ npx @nestjs/observe link
-```
-
-It installs `@nestjs/observe`, wires it into `AppModule` and `main.ts`, and writes the app key and secret into `.env`, which every `nest start` script (`start`, `start:dev`, `start:debug`) then loads. In production, set `OBSERVE_APP_KEY` and `OBSERVE_APP_SECRET` in the environment instead.
-
-Or do it by hand:
-
-```bash
-$ pnpm install @nestjs/observe
-```
-
-Then follow the [setup guide](https://docs.nestjs.com/observability/sdk) - it takes a single import and an app key.
-
-The free plan needs no payment details and covers 300,000 events a month. You can also browse the [live demo](https://www.observe-demo.nestjs.com/dashboard) first - the whole dashboard over a busy service's data, with nothing to install.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observe](https://observe.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+## 📄 Lisensi
+Private / Personal Project.

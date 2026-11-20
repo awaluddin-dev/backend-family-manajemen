@@ -8,4 +8,8 @@ export class LoginDto {
   @IsString()
   @IsNotEmpty()
   password!: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Captcha token is required' })
+  captchaToken!: string;
 }
